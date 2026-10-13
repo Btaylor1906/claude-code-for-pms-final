@@ -24,6 +24,12 @@ prompt library built from your own questions.
 
 ### 1.
 
+what is contradictory or missing across the wiki pages, the handover note, and the rest of the file?
+
 ### 2.
 
+what data sources are referenced in the files
+
 ### 3.
+
+What user research is includes in the files
