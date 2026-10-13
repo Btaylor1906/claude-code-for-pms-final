@@ -10,6 +10,6 @@
 - ✓ Course folder linked to my GitHub repo
 - ✓ My repo is Public
 - ✓ Signed in to GitHub
-- ✗ Rook wiki answers
-- ✗ Rook database answers
+- ✓ Rook wiki answers
+- ✓ Rook database answers
 - ✓ Saving works (this file was saved to GitHub)
