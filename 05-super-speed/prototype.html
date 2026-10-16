@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rook Dispatch console: Quiet responders (prototype)</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --panel:#fff; --ink:#1c2230; --muted:#677084; --line:#dfe3ea;
+    --brand:#23324d; --accent:#2f6fed; --quiet:#b45309; --quiet-bg:#fff4e0; --quiet-line:#f3c98b;
+    --taken:#3b8f6b; --down:#c7ccd6; --missed:#d2573f; --ok-bg:#e6f4ee; --ok:#256a4e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+  button{font:inherit;cursor:pointer}
+  .proto{background:#fff8d6;border-bottom:1px solid #ecdc8a;padding:8px 20px;font-size:13px;color:#5b4b00}
+  .proto b{font-weight:600}
+  header.top{background:var(--brand);color:#fff;display:flex;align-items:center;gap:24px;padding:0 20px;height:52px}
+  header.top .logo{font-weight:700;letter-spacing:.3px}
+  header.top .logo span{font-weight:400;opacity:.7;margin-left:6px}
+  nav.tabs{display:flex;gap:4px;height:100%}
+  nav.tabs button{background:none;border:0;color:#cfd6e6;padding:0 14px;height:100%;border-bottom:3px solid transparent}
+  nav.tabs button.on{color:#fff;border-bottom-color:#7fb0ff}
+  .who{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px}
+  .who select{font:inherit;padding:5px 8px;border-radius:6px;border:0}
+  main{max-width:1100px;margin:0 auto;padding:20px}
+  h1{font-size:20px;margin:0 0 2px}
+  .sub{color:var(--muted);margin:0 0 16px;font-size:13px}
+  .bar{display:flex;align-items:center;gap:12px;margin:0 0 14px;flex-wrap:wrap}
+  .switch{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none}
+  .switch input{width:16px;height:16px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;cursor:pointer;text-align:left;width:100%;transition:box-shadow .15s,border-color .15s}
+  .card:hover,.card:focus-visible{box-shadow:0 2px 10px rgba(30,40,70,.12);border-color:#b9c3d6;outline:none}
+  .card.quiet{border-color:var(--quiet-line)}
+  .card .head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .name{font-weight:650;font-size:17px}
+  .area{color:var(--muted);font-size:13px}
+  .chip{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--ok-bg);color:var(--ok);font-weight:600}
+  .chip.quiet{background:var(--quiet-bg);color:var(--quiet);border:1px solid var(--quiet-line)}
+  .chip.plain{background:#eef0f4;color:var(--muted)}
+  .head .right{margin-left:auto}
+  .facts{margin:8px 0 10px;font-size:14px}
+  .facts.q{background:var(--quiet-bg);border:1px solid var(--quiet-line);border-radius:8px;padding:8px 10px}
+  .spark{display:block;width:100%;height:46px}
+  .meta{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:6px}
+  .empty{padding:30px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:10px}
+  /* drawer */
+  .scrim{position:fixed;inset:0;background:rgba(20,28,45,.35);display:none;z-index:5}
+  .scrim.on{display:block}
+  aside.drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background:var(--panel);box-shadow:-6px 0 24px rgba(0,0,0,.18);z-index:6;transform:translateX(105%);transition:transform .2s;overflow:auto;padding:20px}
+  aside.drawer.on{transform:none}
+  .close{float:right;border:0;background:#eef0f4;border-radius:6px;padding:4px 10px}
+  .drawer h2{margin:0 0 2px;font-size:20px}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+  .kpi{border:1px solid var(--line);border-radius:8px;padding:10px}
+  .kpi b{display:block;font-size:22px}
+  .kpi span{color:var(--muted);font-size:12px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:6px 0}
+  .seg button{border:0;background:#fff;padding:5px 12px;font-size:13px}
+  .seg button.on{background:var(--brand);color:#fff}
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin:2px 0 6px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+  .box{border:1px solid var(--line);border-radius:8px;padding:12px;margin:14px 0;font-size:14px}
+  .box h3{margin:0 0 6px;font-size:14px}
+  .box.not{background:#f7f8fa}
+  details summary{cursor:pointer;font-weight:600}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px}
+  td.num,th.num{text-align:right}
+  .o-taken{color:var(--taken);font-weight:600}.o-missed{color:var(--missed);font-weight:600}.o-down{color:var(--muted)}
+  .btn{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-weight:600}
+  .btn.ghost{background:#eef2fc;color:var(--accent)}
+  .row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#1c2230;color:#fff;padding:10px 16px;border-radius:8px;opacity:0;pointer-events:none;transition:.2s;z-index:9;max-width:90%}
+  .toast.on{opacity:1;transform:translateX(-50%)}
+  .note{font-size:12px;color:var(--muted);margin-top:14px}
+  @media (max-width:640px){
+    header.top{height:auto;flex-wrap:wrap;padding:8px 14px 0;gap:6px 14px}
+    nav.tabs{order:3;width:100%;height:auto}
+    nav.tabs button{height:40px;white-space:nowrap;padding:0 12px}
+    .who{margin-left:auto}
+    main{padding:14px}
+    .cards{grid-template-columns:1fr}
+    .kpis{grid-template-columns:1fr 1fr 1fr;gap:6px}
+    .kpi b{font-size:18px}
+    #view-list .card{overflow-x:auto}
+    #view-list table{min-width:560px}
+  }
+  .tagline{display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<div class="proto"><b>Prototype for discussion.</b> Weekly ping counts are real, from the Rook pings table (29 Jun to 6 Sep 2026). The "Quiet" rule (under 50% of a responder's own 6-week average) and the wording are proposals from the brief, not shipped features. Click a card, the filter, the tabs, or switch handler.</div>
+
+<header class="top">
+  <div class="logo">ROOK <span>Dispatch console</span></div>
+  <nav class="tabs" id="tabs">
+    <button class="on" data-tab="coverage">Coverage</button>
+    <button data-tab="list">Weekly quiet list</button>
+  </nav>
+  <div class="who">Signed in as
+    <select id="handler" aria-label="Handler"></select>
+  </div>
+</header>
+
+<main>
+  <section id="view-coverage">
+    <h1 id="covTitle">Coverage</h1>
+    <p class="sub" id="covSub"></p>
+    <div class="bar">
+      <label class="switch"><input type="checkbox" id="onlyQuiet"> Show only quiet responders</label>
+      <span class="sub" style="margin:0" id="qCount"></span>
+    </div>
+    <div class="cards" id="cards"></div>
+    <p class="note">Phase 2b in the brief (handler console line). Shows facts from the pings table only. It does not say why a responder is quiet; ranking scores are not visible to anyone yet.</p>
+  </section>
+
+  <section id="view-list" hidden>
+    <h1>Weekly quiet list</h1>
+    <p class="sub">MVP, no engineering: Ravi Menon sends this to Nadia Hoffmann and handlers every week. Responders whose pings last week were under half their own 6-week average. Week of 31 Aug (data to 6 Sep).</p>
+    <div class="card" style="cursor:default;padding:6px 12px">
+      <table id="listTable"></table>
+    </div>
+    <p class="note">Click a row to open the same detail as the console. "Copy reply" gives Support wording based on facts only.</p>
+  </section>
+</main>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+<div class="toast" id="toast"></div>
+
+<script>
+const WEEKS=["29 Jun","6 Jul","13 Jul","20 Jul","27 Jul","3 Aug","10 Aug","17 Aug","24 Aug","31 Aug"];
+const RELEASE_WEEK=6; // week of 10 Aug contains 4.2 (12 Aug)
+const R={
+ "The Undertow":{handler:"Desmond Okafor",area:"Harborside",last:"5 Sep",
+   pings:[12,11,12,13,12,12,11,4,1,1],taken:[9,9,9,10,10,9,4,1,0,0],down:[3,2,2,3,2,3,2,1,0,0],missed:[0,0,1,0,0,0,5,2,1,1],
+   recent:[["8 Aug","taken"],["10 Aug","taken"],["10 Aug","taken"],["11 Aug","turned down"],["12 Aug","missed"],["13 Aug","missed"],["13 Aug","taken"],["13 Aug","taken"],["13 Aug","missed"],["14 Aug","missed"],["14 Aug","missed"],["16 Aug","turned down"],["17 Aug","turned down"],["17 Aug","taken"],["18 Aug","missed"],["21 Aug","missed"],["27 Aug","missed"],["5 Sep","missed"]],
+   tickets:11},
+ "Meteor Mite":{handler:"Kip",area:"Eastgate",last:"5 Sep",
+   pings:[11,12,10,11,12,11,10,4,2,1],taken:[7,9,6,7,9,8,4,1,0,0],down:[4,3,4,3,2,3,2,1,1,0],missed:[0,0,0,1,1,0,4,2,1,1]},
+ "The Gale":{handler:"Kip",area:"Eastgate",last:"5 Sep",
+   pings:[13,12,13,14,13,13,15,17,20,21],taken:[10,9,10,11,11,10,9,12,14,16],down:[2,3,3,2,1,3,3,3,4,3],missed:[1,0,0,1,1,0,3,2,2,2]},
+ "Vesper":{handler:"Aunt Dot",area:"Old Town",last:"1 Sep",
+   pings:[14,13,15,14,13,14,12,5,2,1],taken:[11,10,13,11,11,12,6,1,0,0],down:[3,2,1,3,1,2,2,1,1,0],missed:[0,1,1,0,1,0,4,3,1,1]},
+ "Farlight":{handler:"Linda Pruitt",area:"Uptown",last:"28 Aug",
+   pings:[12,12,11,12,13,12,10,3,1,0],taken:[9,9,8,9,10,8,4,0,0,0],down:[3,3,2,2,3,3,2,1,0,0],missed:[0,0,1,1,0,1,4,2,1,0]}
+};
+// handler -> responders shown on their console. Only responders with data in this prototype are listed.
+const HANDLERS={"Desmond Okafor":["The Undertow"],"Kip":["Meteor Mite","The Gale"],"Aunt Dot":["Vesper"],"Linda Pruitt":["Farlight"]};
+
+const avg=a=>a.reduce((s,x)=>s+x,0)/a.length;
+function stats(n){
+  const r=R[n], base=avg(r.pings.slice(0,6)), now=r.pings[9];
+  return {base, now, missed:r.missed[9], down:r.down[9], quiet: now < 0.5*base};
+}
+const f1=x=>(Math.round(x*10)/10).toString();
+const plural=(n,w)=>n+" "+w+(n===1?"":"s");
+
+function factLine(n){
+  const s=stats(n), r=R[n];
+  if(s.quiet){
+    let t=`${plural(s.now,"ping")} in the last 7 days (usual: ${f1(s.base)}). `;
+    if(s.now>0) t+=`${s.missed} of ${s.now} missed. `;
+    t+=`Last pinged ${r.last}.`;
+    return t;
+  }
+  return `${plural(s.now,"ping")} in the last 7 days (usual: ${f1(s.base)}). ${s.missed} missed, ${s.down} turned down.`;
+}
+
+function spark(n){
+  const r=R[n], max=Math.max(...r.pings,1), w=300, h=46, bw=w/10;
+  let out=`<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="Weekly pings">`;
+  r.pings.forEach((v,i)=>{
+    const bh=Math.max(1,v/max*(h-4));
+    out+=`<rect x="${i*bw+3}" y="${h-bh}" width="${bw-6}" height="${bh}" rx="2" fill="${i===9&&stats(n).quiet?'#b45309':i>=RELEASE_WEEK?'#c9ad8b':'#b9c3d6'}"/>`;
+  });
+  return out+"</svg>";
+}
+
+function render(){
+  const h=document.getElementById("handler").value;
+  const only=document.getElementById("onlyQuiet").checked;
+  const names=HANDLERS[h];
+  document.getElementById("covTitle").textContent="Coverage: "+h;
+  document.getElementById("covSub").textContent=names.length>1
+    ?"Two responders side by side. Compare their weeks at a glance."
+    :"Your responder, with this week's pings next to their usual.";
+  const quietN=names.filter(n=>stats(n).quiet).length;
+  document.getElementById("qCount").textContent=quietN?`${quietN} of ${names.length} quiet this week`:"None quiet this week";
+  const shown=only?names.filter(n=>stats(n).quiet):names;
+  const el=document.getElementById("cards");
+  if(!shown.length){el.innerHTML=`<div class="empty">Nobody is quiet right now.<br>Untick the filter to see all your responders.</div>`;return;}
+  el.innerHTML=shown.map(n=>{
+    const s=stats(n), r=R[n];
+    return `<button class="card ${s.quiet?'quiet':''}" data-name="${n}">
+      <div class="head"><span class="name">${n}</span><span class="area">${r.area}</span>
+        <span class="right">${s.quiet?'<span class="chip quiet">Quiet</span>':''} <span class="chip">Available</span></span></div>
+      <div class="facts ${s.quiet?'q':''}">${factLine(n)}</div>
+      ${spark(n)}
+      <div class="meta"><span>Weekly pings, 29 Jun to 6 Sep</span><span>Click for detail</span></div>
+    </button>`;
+  }).join("");
+}
+
+function chart(n,mode){
+  const r=R[n], W=500,H=190,L=30,B=24,T=10, cw=(W-L-4)/10, ph=H-B-T;
+  const max=Math.max(...r.pings)+1, y=v=>T+ph-(v/max*ph);
+  const base=avg(r.pings.slice(0,6));
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Weekly pings for ${n}">`;
+  [0,5,10,15].filter(v=>v<=max).forEach(v=>{s+=`<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#eceff4"/><text x="${L-6}" y="${y(v)+4}" font-size="10" text-anchor="end" fill="#677084">${v}</text>`});
+  r.pings.forEach((v,i)=>{
+    const x=L+i*cw+6, bw=cw-12;
+    if(mode==="total"){
+      s+=`<rect x="${x}" y="${y(v)}" width="${bw}" height="${ph-(y(v)-T)}" rx="2" fill="#8ea3c7"/>`;
+    }else{
+      let cum=0;
+      [["taken","var(--taken)"],["down","var(--down)"],["missed","var(--missed)"]].forEach(([k,c])=>{
+        const val=r[k][i]; if(!val) return;
+        const y0=y(cum+val), hh=y(cum)-y0; cum+=val;
+        s+=`<rect x="${x}" y="${y0}" width="${bw}" height="${hh}" fill="${c}"/>`;
+      });
+    }
+    s+=`<text x="${x+bw/2}" y="${H-8}" font-size="9" text-anchor="middle" fill="#677084">${WEEKS[i].replace(" "," ")}</text>`;
+  });
+  s+=`<line x1="${L}" x2="${W}" y1="${y(base)}" y2="${y(base)}" stroke="#1c2230" stroke-dasharray="4 3"/><text x="${W-2}" y="${y(base)-4}" font-size="10" text-anchor="end" fill="#1c2230">usual ${f1(base)}</text>`;
+  s+=`<line x1="${L}" x2="${W}" y1="${y(base/2)}" y2="${y(base/2)}" stroke="#b45309" stroke-dasharray="2 3"/><text x="${W-2}" y="${y(base/2)-4}" font-size="10" text-anchor="end" fill="#b45309">half of usual: below this = Quiet</text>`;
+  const rx=L+RELEASE_WEEK*cw+cw/2;
+  s+=`<line x1="${rx}" x2="${rx}" y1="${T}" y2="${T+ph}" stroke="#677084" stroke-dasharray="1 3"/><text x="${rx+4}" y="${T+10}" font-size="10" fill="#677084">4.2 (12 Aug)</text>`;
+  return s+"</svg>";
+}
+
+let current=null, mode="outcome";
+function openDrawer(n){
+  current=n; drawerHTML();
+  document.getElementById("drawer").classList.add("on");document.getElementById("scrim").classList.add("on");
+  document.getElementById("drawer").setAttribute("aria-hidden","false");
+}
+function closeDrawer(){
+  document.getElementById("drawer").classList.remove("on");document.getElementById("scrim").classList.remove("on");
+  document.getElementById("drawer").setAttribute("aria-hidden","true");
+}
+function drawerHTML(){
+  const n=current, r=R[n], s=stats(n);
+  const last4=r.recent?r.recent.slice(-4):null;
+  const all4missed=last4&&last4.every(x=>x[1]==="missed");
+  const d=document.getElementById("drawer");
+  d.innerHTML=`
+    <button class="close" id="closeBtn">Close</button>
+    <h2>${n} ${s.quiet?'<span class="chip quiet">Quiet</span>':''}</h2>
+    <div class="tagline"><span>Handler: ${r.handler}</span><span>·</span><span>${r.area}</span><span>·</span><span>Availability: Available</span></div>
+    <div class="facts ${s.quiet?'q':''}">${factLine(n)}${all4missed?' Last 4 pings: all missed.':''}</div>
+    <div class="kpis">
+      <div class="kpi"><b>${s.now}</b><span>pings, last 7 days</span></div>
+      <div class="kpi"><b>${f1(s.base)}</b><span>usual per week (6 weeks to 3 Aug)</span></div>
+      <div class="kpi"><b>${r.last}</b><span>last pinged</span></div>
+    </div>
+    <div class="seg" role="group" aria-label="Chart colour">
+      <button data-mode="outcome" class="${mode==='outcome'?'on':''}">By outcome</button>
+      <button data-mode="total" class="${mode==='total'?'on':''}">Total only</button>
+    </div>
+    ${mode==="outcome"?`<div class="legend"><span><i style="background:var(--taken)"></i>Taken</span><span><i style="background:var(--down)"></i>Turned down</span><span><i style="background:var(--missed)"></i>Missed (ping wait ran out)</span></div>`:""}
+    ${chart(n,mode)}
+    <div class="box"><details><summary>What does "Quiet" mean?</summary>
+      <p style="margin:8px 0 0">A responder is shown as Quiet when their pings in the last 7 days are under half of their own 6-week average. It describes what happened, not why. It does not mean their availability or capability tags are wrong. <i>(Proposed rule. The threshold is to be confirmed with Ravi Menon and Wen Li.)</i></p></details></div>
+    ${r.recent?`<div class="box"><h3>Recent pings</h3><table><tr><th>Date</th><th>Outcome</th></tr>
+      ${r.recent.slice().reverse().map(x=>`<tr><td>${x[0]}</td><td class="${x[1]==='taken'?'o-taken':x[1]==='missed'?'o-missed':'o-down'}">${x[1]}</td></tr>`).join("")}</table></div>`:""}
+    <div class="box not"><h3>What this screen does not show yet</h3>
+      Why the responder is quiet. Ranking scores and response times are not logged or shown (Phase 2a). Nothing here links a cover identity to a real one.</div>
+    ${r.tickets?`<div class="box"><h3>Support</h3>${r.tickets} open tickets about ${n}. Use the note below to reply with facts.</div>`:""}
+    <div class="row-actions">
+      <button class="btn" id="copyBtn">Copy summary for Support</button>
+      <button class="btn ghost" id="flagBtn">Mark as noticed</button>
+    </div>
+    <p class="note">Weekly numbers are real (pings table, to 6 Sep 2026).</p>`;
+  document.getElementById("closeBtn").onclick=closeDrawer;
+  d.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>{mode=b.dataset.mode;drawerHTML()});
+  document.getElementById("copyBtn").onclick=()=>copyText(summary(n));
+  document.getElementById("flagBtn").onclick=function(){this.textContent="Noticed. Support can see this.";this.disabled=true;toast("Marked as noticed (prototype: nothing is saved)")};
+}
+function summary(n){
+  const s=stats(n), r=R[n];
+  return `${n} (handler: ${r.handler}): ${plural(s.now,"ping")} in the last 7 days against a usual ${f1(s.base)} a week. `+
+   `${s.missed} missed, ${s.down} turned down. Last pinged ${r.last}. Availability and tags are not the cause of the count. `+
+   `We are looking at how recent missed pings affect who gets offered callouts and will update you.`;
+}
+function copyText(t){
+  const done=()=>toast("Copied to clipboard");
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,()=>{fallback(t);done()})}else{fallback(t);done()}
+}
+function fallback(t){const a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy")}catch(e){}a.remove()}
+let tt;function toast(m){const e=document.getElementById("toast");e.textContent=m;e.classList.add("on");clearTimeout(tt);tt=setTimeout(()=>e.classList.remove("on"),2200)}
+
+function renderList(){
+  const rows=Object.keys(R).filter(n=>stats(n).quiet).sort((a,b)=>stats(a).now-stats(b).now);
+  document.getElementById("listTable").innerHTML=
+    `<tr><th>Responder</th><th>Handler</th><th class="num">Pings last 7 days</th><th class="num">Usual / week</th><th class="num">Missed</th><th class="num">Turned down</th><th>Last pinged</th><th></th></tr>`+
+    rows.map(n=>{const s=stats(n),r=R[n];return `<tr data-row="${n}" style="cursor:pointer"><td><b>${n}</b></td><td>${r.handler}</td><td class="num">${s.now}</td><td class="num">${f1(s.base)}</td><td class="num o-missed">${s.missed}</td><td class="num">${s.down}</td><td>${r.last}</td><td><button class="btn ghost" data-copy="${n}">Copy reply</button></td></tr>`}).join("");
+  document.querySelectorAll("[data-row]").forEach(tr=>tr.onclick=e=>{ if(e.target.dataset.copy)return; openDrawer(tr.dataset.row)});
+  document.querySelectorAll("[data-copy]").forEach(b=>b.onclick=e=>{e.stopPropagation();copyText(summary(b.dataset.copy))});
+}
+
+// wiring
+const sel=document.getElementById("handler");
+Object.keys(HANDLERS).forEach(h=>{const o=document.createElement("option");o.textContent=h;sel.appendChild(o)});
+sel.onchange=()=>{closeDrawer();render()};
+document.getElementById("onlyQuiet").onchange=render;
+document.getElementById("cards").addEventListener("click",e=>{const c=e.target.closest(".card");if(c)openDrawer(c.dataset.name)});
+document.getElementById("scrim").onclick=closeDrawer;
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer()});
+document.getElementById("tabs").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x===b));
+  document.getElementById("view-coverage").hidden=b.dataset.tab!=="coverage";
+  document.getElementById("view-list").hidden=b.dataset.tab!=="list";
+  closeDrawer();
+});
+render();renderList();
+</script>
+</body>
+</html>

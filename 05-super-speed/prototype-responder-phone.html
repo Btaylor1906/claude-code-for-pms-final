@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rook responder phone: "Am I still in the rotation?" (prototype)</title>
+<style>
+  :root{--ink:#1c2230;--muted:#677084;--line:#e3e6ed;--brand:#23324d;--accent:#2f6fed;--ok:#256a4e;--ok-bg:#e6f4ee;
+        --warn:#b45309;--warn-bg:#fff4e0;--warn-line:#f3c98b;--bad:#d2573f;--bg:#e9ebf0}
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.4 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg);display:flex;flex-direction:column;align-items:center;min-height:100vh}
+  .note{max-width:420px;padding:12px 16px;font-size:13px;color:#5b4b00;background:#fff8d6;border:1px solid #ecdc8a;border-radius:10px;margin:16px 12px 0}
+  .stage{display:flex;gap:24px;align-items:flex-start;justify-content:center;flex-wrap:wrap;padding:16px 12px 32px;width:100%}
+  .phone{width:390px;height:780px;background:#fff;border-radius:38px;border:10px solid #0f1522;box-shadow:0 20px 50px rgba(0,0,0,.25);overflow:hidden;position:relative;display:flex;flex-direction:column}
+  .status{height:34px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 24px 4px;font-size:13px;font-weight:600}
+  .screen{flex:1;overflow:auto;padding:8px 18px 18px;position:relative}
+  h1{font-size:24px;margin:6px 0 2px}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 14px}
+  .panel{border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;background:#fff}
+  .statuscard{border-radius:18px;padding:16px;margin-bottom:14px;border:1px solid transparent}
+  .statuscard.on{background:var(--ok-bg);border-color:#bfe0d0}
+  .statuscard.off{background:#eef0f4;border-color:var(--line)}
+  .statuscard .big{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700}
+  .dot{width:12px;height:12px;border-radius:50%;background:var(--ok)}
+  .off .dot{background:#9aa3b5}
+  .statuscard p{margin:8px 0 0;font-size:15px}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .toggle{position:relative;width:52px;height:30px;background:#c9ceda;border-radius:99px;border:0;padding:0;flex:none;transition:.15s}
+  .toggle::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;background:#fff;border-radius:50%;transition:.15s}
+  .toggle[aria-checked=true]{background:var(--ok)}
+  .toggle[aria-checked=true]::after{left:25px}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  .stat{border:1px solid var(--line);border-radius:14px;padding:12px}
+  .stat b{font-size:24px;display:block}
+  .stat span{font-size:12px;color:var(--muted)}
+  .quiet{background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:14px;padding:12px 14px;margin-bottom:14px;font-size:15px}
+  .quiet b{color:var(--warn)}
+  button.link{background:none;border:0;color:var(--accent);font:inherit;font-weight:600;padding:6px 0;cursor:pointer}
+  .why{font-size:14px;margin-top:6px;color:#2b3345}
+  .why li{margin:6px 0}
+  .btn{display:block;width:100%;border:0;border-radius:14px;padding:14px;font:inherit;font-weight:700;cursor:pointer}
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn.ghost{background:#eef2fc;color:var(--accent)}
+  .btn.take{background:var(--ok);color:#fff}
+  .btn.decline{background:#eef0f4;color:var(--ink)}
+  .tabbar{display:flex;border-top:1px solid var(--line);background:#fff;padding:6px 0 14px}
+  .tabbar button{flex:1;background:none;border:0;font:inherit;font-size:12px;color:var(--muted);padding:6px;cursor:pointer}
+  .tabbar button.on{color:var(--accent);font-weight:700}
+  .list{list-style:none;margin:0;padding:0}
+  .list li{display:flex;justify-content:space-between;padding:11px 2px;border-bottom:1px solid var(--line);font-size:15px}
+  .o-taken{color:var(--ok);font-weight:600}.o-missed{color:var(--bad);font-weight:600}.o-down{color:var(--muted)}
+  .overlay{position:absolute;inset:0;background:#fff;z-index:4;padding:44px 22px 22px;display:none;flex-direction:column}
+  .overlay.on{display:flex}
+  .tag{font-size:12px;letter-spacing:.6px;color:var(--muted);text-transform:uppercase}
+  .timer{font-size:56px;font-weight:800;text-align:center;margin:18px 0 4px}
+  .bar{height:8px;background:#eef0f4;border-radius:99px;overflow:hidden;margin-bottom:22px}
+  .bar i{display:block;height:100%;background:var(--accent);width:100%}
+  .spacer{flex:1}
+  .legend{max-width:340px;font-size:13px;color:#2b3345}
+  .legend h3{margin:0 0 6px;font-size:14px}
+  .legend ul{margin:0 0 12px;padding-left:18px}
+  .legend li{margin:4px 0}
+  .reset{background:none;border:1px solid #b9c3d6;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;color:var(--ink)}
+  @media (max-width:480px){
+    body{background:#fff}.note{display:none}.stage{padding:0}.legend{display:none}
+    .phone{width:100%;height:100vh;border:0;border-radius:0;box-shadow:none}
+  }
+</style>
+</head>
+<body>
+<div class="note"><b>Prototype for discussion.</b> This is the responder-phone status from the brief (a Future item). No responder has been interviewed yet, so the words below are a hypothesis to test with The Undertow, not a design. Counts and recent pings are real (pings table, to 6 Sep 2026). Tap around: the availability switch, "Why is it quiet?", the demo ping, and the Offers tab.</div>
+
+<div class="stage">
+  <div class="phone" id="phone">
+    <div class="status"><span>9:41</span><span>Rook</span></div>
+    <div class="screen" id="screen"></div>
+    <div class="tabbar" id="tabbar">
+      <button data-tab="home" class="on">Home</button>
+      <button data-tab="offers">Offers</button>
+    </div>
+    <div class="overlay" id="ping">
+      <div class="tag">New callout · demo</div>
+      <h1>Callout offered to you</h1>
+      <p class="sub">Harborside · matches your capability tags</p>
+      <div class="timer" id="t">60</div>
+      <div class="bar"><i id="tbar"></i></div>
+      <div class="spacer"></div>
+      <button class="btn take" id="take">Take it</button>
+      <div style="height:10px"></div>
+      <button class="btn decline" id="decline">Turn down</button>
+      <p class="sub" style="text-align:center;margin-top:12px">Ping wait: 60 seconds (current setting; this brief does not change it)</p>
+    </div>
+  </div>
+
+  <div class="legend">
+    <h3>What this screen is trying to answer</h3>
+    <p>The Undertow's handler wrote: <i>"He asked me this morning whether his account is still active."</i> and <i>"starting to wonder if im still even in the system."</i></p>
+    <h3>Rules from the brief</h3>
+    <ul>
+      <li>The status comes from the responder's availability setting. If they are unavailable, it must not say they are in the offer list.</li>
+      <li>No score, no rank, ever.</li>
+      <li>Facts only. It does not say why it is quiet, because we have not seen the ranking scores.</li>
+      <li>Nothing links a cover identity to a real one.</li>
+    </ul>
+    <button class="reset" id="reset">Reset demo</button>
+  </div>
+</div>
+
+<script>
+const INITIAL_RECENT=[["5 Sep","missed"],["27 Aug","missed"],["21 Aug","missed"],["18 Aug","missed"],["17 Aug","taken"],["17 Aug","turned down"],["16 Aug","turned down"],["14 Aug","missed"],["14 Aug","missed"],["13 Aug","missed"],["13 Aug","taken"],["13 Aug","taken"],["13 Aug","missed"],["12 Aug","missed"]];
+const S={tab:"home",available:true,thisWeek:1,usual:12,last:"5 Sep",recent:INITIAL_RECENT.slice(),why:false,justDid:null};
+const $=id=>document.getElementById(id);
+
+function statusCard(){
+  if(!S.available) return `<div class="statuscard off"><div class="big"><span class="dot"></span>You're set to unavailable</div>
+    <p>You won't be offered callouts until you switch back to available.</p></div>`;
+  return `<div class="statuscard on"><div class="big"><span class="dot"></span>You're available</div>
+    <p>You're in the offer list for callouts that match your tags. You haven't been removed from anything.</p>
+    <p style="color:var(--muted);font-size:14px">Last offer: ${S.last}</p></div>`;
+}
+function home(){
+  const quiet=S.available&&S.thisWeek<0.5*S.usual;
+  return `<h1>Hi, The Undertow</h1><p class="sub">Harborside</p>
+  <div class="panel row"><div><b>Available for callouts</b><div class="sub" style="margin:2px 0 0">Switch off if you can't go</div></div>
+    <button class="toggle" id="tog" role="switch" aria-checked="${S.available}" aria-label="Available"></button></div>
+  ${statusCard()}
+  ${S.justDid?`<div class="quiet" style="background:var(--ok-bg);border-color:#bfe0d0"><b style="color:var(--ok)">${S.justDid}</b></div>`:""}
+  <div class="stats"><div class="stat"><b>${S.thisWeek}</b><span>offers in the last 7 days</span></div>
+    <div class="stat"><b>${S.usual}</b><span>your usual per week</span></div></div>
+  ${quiet?`<div class="quiet"><b>It's been quieter than usual.</b> You've had ${S.thisWeek} offer${S.thisWeek===1?"":"s"} this week; you usually get about ${S.usual}.
+    <div><button class="link" id="whyBtn">${S.why?"Hide":"Why is it quiet?"}</button></div>
+    ${S.why?`<ul class="why"><li>Your availability and capability tags are set correctly.</li>
+      <li>You haven't been removed from the offer list.</li>
+      <li>We don't know yet why you're getting fewer offers. We're looking into it, and your handler can see the same numbers as you.</li>
+      <li>Offers that run out before they're answered are recorded as missed.</li></ul>`:""}</div>`:""}
+  <button class="btn ghost" id="demo">Demo: send me an offer</button>`;
+}
+function offers(){
+  return `<h1>Offers</h1><p class="sub">Your most recent offers and what happened</p>
+  <ul class="list">${S.recent.map(r=>`<li><span>${r[0]}</span><span class="${r[1]==='taken'?'o-taken':r[1]==='missed'?'o-missed':'o-down'}">${r[1]==='missed'?'missed (ran out)':r[1]}</span></li>`).join("")}</ul>
+  <p class="sub" style="margin-top:10px">Real pings from 12 Aug to 5 Sep. Demo offers appear at the top.</p>`;
+}
+function render(){
+  $("screen").innerHTML=S.tab==="home"?home():offers();
+  document.querySelectorAll("#tabbar button").forEach(b=>b.classList.toggle("on",b.dataset.tab===S.tab));
+  if($("tog"))$("tog").onclick=()=>{S.available=!S.available;S.justDid=null;render()};
+  if($("whyBtn"))$("whyBtn").onclick=()=>{S.why=!S.why;render()};
+  if($("demo"))$("demo").onclick=startPing;
+}
+document.querySelectorAll("#tabbar button").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;render()});
+
+let timer=null,left=60;
+function startPing(){
+  if(!S.available){S.justDid="Switch to available first to be offered callouts.";render();return}
+  left=60;$("t").textContent=left;$("tbar").style.width="100%";$("ping").classList.add("on");
+  clearInterval(timer);
+  timer=setInterval(()=>{left--;$("t").textContent=left;$("tbar").style.width=(left/60*100)+"%";if(left<=0)finish("missed")},1000);
+}
+function finish(outcome){
+  clearInterval(timer);$("ping").classList.remove("on");
+  S.recent.unshift(["Just now",outcome]);S.thisWeek++;S.last="Just now";
+  S.justDid=outcome==="taken"?"Offer taken. It's yours.":outcome==="missed"?"That offer ran out before it was answered. It was passed on to the next responder.":"Offer turned down. It was passed on to the next responder.";
+  S.tab="home";render();
+}
+$("take").onclick=()=>finish("taken");
+$("decline").onclick=()=>finish("turned down");
+$("reset").onclick=()=>{clearInterval(timer);$("ping").classList.remove("on");Object.assign(S,{tab:"home",available:true,thisWeek:1,last:"5 Sep",recent:INITIAL_RECENT.slice(),why:false,justDid:null});render()};
+render();
+</script>
+</body>
+</html>
